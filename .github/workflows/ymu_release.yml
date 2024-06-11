@@ -1,6 +1,6 @@
 # This workflow will install Python dependencies, run tests, build an executable then upload it to github releases
 
-name: YMU Release
+name: YMU-SU Release
 
 on: 
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
 
   build:
     runs-on: windows-latest
-    name: Build YMU
+    name: Build YMU-SU
     outputs:
       full_sha: ${{ steps.var.outputs.full_sha }}
     steps:
@@ -23,8 +23,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pyinstaller
-        pip install -r requirements.txt
+        pip install flake8 pyinstaller requests bs4
 
     - name: Verify With Flake8
       run: |
@@ -35,7 +34,7 @@ jobs:
 
     - name: Build Executable
       run: |
-        pyinstaller "ymu.py" --noconfirm --onefile --windowed --noconsole --add-data='D:\a\YMU\YMU\icon\ymu.ico':icon --add-data='D:\a\YMU\YMU\ymu.png':splash --icon='D:\a\YMU\YMU\icon\ymu.ico' --splash "D:\a\YMU\YMU\ymu.png"
+        pyinstaller ymu_self_updater.py --noconfirm --onefile --console --icon "./icon/ymu.ico"  
 
     - name: Generate Build Info
       id: var
@@ -48,7 +47,7 @@ jobs:
       with:
         name: binary
         path: |
-          dist\ymu.exe
+          dist\ymu_self_updater.exe
 
   create_release:
     runs-on: ubuntu-latest
@@ -64,85 +63,63 @@ jobs:
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;
+            const tag = "latest";
       
-            // List all releases
+            // List all releases and find the release by tag
             const releases = await github.rest.repos.listReleases({
               owner: owner,
               repo: repo,
             });
 
-            // Iterate over each release and delete it
-            for (const release of releases.data) {
+            const release = releases.data.find(release => release.tag_name === tag);
+      
+            // Check if the release exists and delete it
+            if (release) {
               await github.rest.repos.deleteRelease({
                 owner: owner,
                 repo: repo,
                 release_id: release.id,
               });
               console.log(`Deleted release with ID ${release.id}`);
+            } else {
+              console.log("No existing release to delete");
             }
-
-            // List all tags
-            const tags = await github.rest.repos.listTags({
-              owner: owner,
-              repo: repo,
-            });
+      
+            // Delete the tag
+            try {
+              await github.rest.git.deleteRef({
+                owner: owner,
+                repo: repo,
+                ref: `tags/${tag}`,
+              });
+              console.log(`Deleted tag ${tag}`);
+            } catch (error) {
+              console.error(`Error deleting tag: ${error.message}`);
+            }
 
       - name: Download Artifact
         uses: actions/download-artifact@v4
         with:
           name: binary
 
-      - name: Increment Version
-        id: increment_version
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            // Get the latest tag
-            const tags = await github.rest.repos.listTags({
-              owner: owner,
-              repo: repo,
-            });
-            let newVersion;
-            let oldTag;
-            if (tags.data.length === 0) {
-              // No tags found, start with a default version
-              console.log('No existing tags found. Starting with version v1.0.1');
-              newVersion = 'v1.0.1';
-            } else {
-              // Extract the latest tag name
-              const latestTag = tags.data[0].name;
-              const versionParts = latestTag.substring(1).split('.').map(Number);
-              versionParts[2] += 1; // Increment the patch version
-              newVersion = `v${versionParts.join('.')}`;
-              oldTag = latestTag;
-            }
-            core.setOutput("new_version", newVersion); 
-            core.setOutput("old_tag", oldTag);
         
       - name: Echo build_sha256
         id: build_sha
         run: |
-          sha256sum ymu.exe > sha256.checksum
+          sha256sum ymu_self_updater.exe > sha256.checksum
           echo "build_sha=$(cat sha256.checksum)" >> $GITHUB_OUTPUT
           cat sha256.checksum
 
       - name: Upload Release
         uses: softprops/action-gh-release@v2
         with:
-          name: YMU ${{ steps.increment_version.outputs.new_version }}
-          tag_name: ${{ steps.increment_version.outputs.new_version }}
-          body: | # here you can put whatever you want to display in the release page
-              ### Changelog:
-              - GUI changes (Download- and Update-tab now united again and SHA256-Tab completely removed + other small changes)
-              - Added Changelog of YimMenu
-              - fixed [YMU not terminating correctly](https://github.com/NiiV3AU/YMU/issues/3)
-
+          name: YMU-SU
+          tag_name: latest
+          body: |
 
               **This release has been built by Github Actions**
 
               [Link to build](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
 
           files: |
-            ymu.exe
+            ymu_self_updater.exe
