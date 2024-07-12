@@ -9,7 +9,7 @@ from time import sleep
 
 
 
-logfile = open("./ymu.log", "a")
+logfile = open("./ymu/ymu.log", "a")
 logfile.write("---Initializing YMU-Self Updater...\n\n")
 logfile.close()
 log = logging.getLogger("YMU-SU")
