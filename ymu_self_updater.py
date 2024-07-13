@@ -13,7 +13,7 @@ logfile = open("./ymu/ymu.log", "a")
 logfile.write("---Initializing YMU-Self Updater...\n\n")
 logfile.close()
 log = logging.getLogger("YMU-SU")
-logging.basicConfig(filename = 'ymu.log',
+logging.basicConfig(filename = './ymu/ymu.log',
                     encoding = 'utf-8',
                     level    = logging.DEBUG,
                     format   = '%(asctime)s %(levelname)s %(name)s %(message)s',
